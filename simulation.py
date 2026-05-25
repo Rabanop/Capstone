@@ -94,8 +94,14 @@ class PortTerminalSimulation:
                 'yard_occupancy_at_arrival': self.get_yard_occupancy()
             })
             
-            # Tiempo operativo dentro del patio (ej: carga/descarga toma 45 min)
-            yield self.env.timeout(45.0)
+            # Tiempo operativo dentro del patio con penalización por congestión (Lean)
+            # A mayor ocupación, mayor tiempo de maniobra/barajado de contenedores (shuffling delay)
+            occupancy = self.get_yard_occupancy()
+            yard_stay_time = 45.0
+            if occupancy > 0.70:
+                yard_stay_time *= (1.0 + 1.5 * (occupancy - 0.70))
+            
+            yield self.env.timeout(yard_stay_time)
             
         # Reducir el historial reciente para mantener una ventana móvil
         if self.total_recent > 50:
