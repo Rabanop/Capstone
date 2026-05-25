@@ -111,15 +111,15 @@ color_dinamico = '#1f77b4' # Azul corporativo para el dinámico
 with col_chart1:
     st.markdown("### Espera Promedio por Hora", help="Muestra de manera sencilla cuántos minutos en promedio espera un camión dependiendo de la hora del día a la que llega.")
     
-    # Simplificar: Agrupar por hora de llegada para que el gráfico sea muy fácil de leer
-    df_static['Hora'] = (df_static['actual_arrival'] // 60).astype(int)
+    # Simplificar: Agrupar por hora de cita planificada para que la comparativa sea justa
+    df_static['Hora'] = (df_static['scheduled_arrival'] // 60).astype(int)
     if not df_static.empty:
         df_static_agg = df_static.groupby('Hora')['total_wait_time'].mean().reset_index()
         df_static_agg['scenario'] = 'Estático'
     else:
         df_static_agg = pd.DataFrame()
     
-    df_dynamic['Hora'] = (df_dynamic['actual_arrival'] // 60).astype(int)
+    df_dynamic['Hora'] = (df_dynamic['scheduled_arrival'] // 60).astype(int)
     if not df_dynamic.empty:
         df_dynamic_agg = df_dynamic.groupby('Hora')['total_wait_time'].mean().reset_index()
         df_dynamic_agg['scenario'] = 'Dinámico'

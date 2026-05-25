@@ -30,13 +30,27 @@ class PortTerminalSimulation:
             
         actual_arrival = scheduled_arrival
         
+        virtual_wait_yard = 0.0
+        virtual_wait_gate = 0.0
+        
         # Escenario Dinámico: VBS actúa como sistema Pull (Lean)
         if self.is_dynamic:
             # Mientras haya mucha fila en puerta (> 2 veces la capacidad) o el patio esté a > 60%
             # El VBS retiene al camión virtualmente ("Espera en tu almacén")
-            while len(self.gate.queue) > (self.gate.capacity * 2) or self.get_yard_occupancy() > 0.60:
+            while True:
+                gate_full = len(self.gate.queue) > (self.gate.capacity * 2)
+                yard_full = self.get_yard_occupancy() > 0.85
+                
+                if not (gate_full or yard_full):
+                    break
+                
                 yield self.env.timeout(10.0) # Revisa cada 10 mins
                 actual_arrival += 10.0
+                
+                if yard_full:
+                    virtual_wait_yard += 10.0
+                else:
+                    virtual_wait_gate += 10.0
                 
         # Llegada física al terminal
         arrival_time = self.env.now
@@ -62,12 +76,16 @@ class PortTerminalSimulation:
             wait_time_yard = self.env.now - gate_end_time
             
             # Guardar resultados
-            total_wait_time = wait_time_gate + wait_time_yard
+            virtual_wait_time = virtual_wait_yard + virtual_wait_gate
+            total_wait_time = virtual_wait_time + wait_time_gate + wait_time_yard
             
             self.results.append({
                 'truck_id': truck_id,
                 'scheduled_arrival': scheduled_arrival,
                 'actual_arrival': arrival_time,
+                'virtual_wait_time': virtual_wait_time,
+                'virtual_wait_yard': virtual_wait_yard,
+                'virtual_wait_gate': virtual_wait_gate,
                 'wait_time_gate': wait_time_gate,
                 'wait_time_yard': wait_time_yard,
                 'total_wait_time': total_wait_time,
@@ -102,18 +120,24 @@ def run_scenarios(df: pd.DataFrame, params: Dict[str, Any]) -> Tuple[pd.DataFram
     env_static = simpy.Environment()
     sim_static = PortTerminalSimulation(env_static, df, params, is_dynamic=False)
     sim_static.run()
-    env_static.run(until=params['sim_time_hours'] * 60)
+    env_static.run()  # Corre hasta completar todos los eventos
     df_static = pd.DataFrame(sim_static.results)
+    
+    # Filtrar para conservar solo los camiones que debían llegar dentro del tiempo de la simulación
     if not df_static.empty:
+        df_static = df_static[df_static['scheduled_arrival'] <= params['sim_time_hours'] * 60]
         df_static['scenario'] = 'Estático'
     
     # Ejecutar escenario Dinámico
     env_dynamic = simpy.Environment()
     sim_dynamic = PortTerminalSimulation(env_dynamic, df, params, is_dynamic=True)
     sim_dynamic.run()
-    env_dynamic.run(until=params['sim_time_hours'] * 60)
+    env_dynamic.run()  # Corre hasta completar todos los eventos
     df_dynamic = pd.DataFrame(sim_dynamic.results)
+    
+    # Filtrar para conservar solo los camiones que debían llegar dentro del tiempo de la simulación
     if not df_dynamic.empty:
+        df_dynamic = df_dynamic[df_dynamic['scheduled_arrival'] <= params['sim_time_hours'] * 60]
         df_dynamic['scenario'] = 'Dinámico'
     
     return df_static, df_dynamic

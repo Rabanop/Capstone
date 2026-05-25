@@ -13,8 +13,9 @@ def analyze_root_causes(df: pd.DataFrame) -> Dict[str, float]:
             'Llegada de muchos camiones a la vez': 0
         }
         
-    # 1. Falta de espacio en patio
-    total_wait_yard = df['wait_time_yard'].sum()
+    # 1. Falta de espacio en patio (espera física + virtual por patio lleno)
+    virtual_wait_yard_sum = df['virtual_wait_yard'].sum() if 'virtual_wait_yard' in df.columns else 0.0
+    total_wait_yard = df['wait_time_yard'].sum() + virtual_wait_yard_sum
     
     # 2. Errores en documentos
     base_avg = df[~df['has_error']]['total_val_time'].mean()
@@ -24,8 +25,9 @@ def analyze_root_causes(df: pd.DataFrame) -> Dict[str, float]:
     error_extra_time = df[df['has_error']]['total_val_time'] - base_avg
     total_error_impact = error_extra_time[error_extra_time > 0].sum()
     
-    # 3. Llegadas masivas
-    total_wait_gate = df['wait_time_gate'].sum()
+    # 3. Llegadas masivas (espera física en puerta + virtual por cola en puerta)
+    virtual_wait_gate_sum = df['virtual_wait_gate'].sum() if 'virtual_wait_gate' in df.columns else 0.0
+    total_wait_gate = df['wait_time_gate'].sum() + virtual_wait_gate_sum
     arrival_peaks_impact = max(0, total_wait_gate - total_error_impact)
         
     return {
