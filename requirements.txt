@@ -1,0 +1,6 @@
+streamlit
+simpy
+pandas
+plotly
+numpy
+python-docx
