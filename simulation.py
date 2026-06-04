@@ -12,12 +12,28 @@ class PortTerminalSimulation:
         # Recursos
         self.gate = simpy.Resource(env, capacity=params['gate_capacity'])
         self.yard = simpy.Resource(env, capacity=params['yard_capacity'])
+        self.virtual_queue = simpy.Store(env)
         
         self.results = []
         
         # Para el VBS dinámico, controlamos la tasa de fallas reciente (ventana móvil simple)
         self.recent_errors = 0
         self.total_recent = 0
+        
+        if self.is_dynamic:
+            self.env.process(self.vbs_controller())
+
+    def vbs_controller(self):
+        while True:
+            gate_full = len(self.gate.queue) > (self.gate.capacity * 2)
+            yard_full = self.get_yard_occupancy() > 0.85
+            
+            if not (gate_full or yard_full) and len(self.virtual_queue.items) > 0:
+                release_event = yield self.virtual_queue.get()
+                release_event.succeed()
+                yield self.env.timeout(0.1) # Permitir que el camión entre a la cola física
+            else:
+                yield self.env.timeout(1.0) # Revisar cada minuto
 
     def get_yard_occupancy(self):
         return self.yard.count / self.yard.capacity
@@ -33,24 +49,24 @@ class PortTerminalSimulation:
         virtual_wait_yard = 0.0
         virtual_wait_gate = 0.0
         
-        # Escenario Dinámico: VBS actúa como sistema Pull (Lean)
+        # Escenario Dinámico: VBS actúa como sistema Pull (Lean) garantizando FIFO
         if self.is_dynamic:
-            # Mientras haya mucha fila en puerta (> 2 veces la capacidad) o el patio esté a > 60%
-            # El VBS retiene al camión virtualmente ("Espera en tu almacén")
-            while True:
-                gate_full = len(self.gate.queue) > (self.gate.capacity * 2)
-                yard_full = self.get_yard_occupancy() > 0.85
+            gate_full = len(self.gate.queue) > (self.gate.capacity * 2)
+            yard_full = self.get_yard_occupancy() > 0.85
+            
+            if gate_full or yard_full:
+                wait_start = self.env.now
+                release_event = self.env.event()
+                yield self.virtual_queue.put(release_event)
+                yield release_event
                 
-                if not (gate_full or yard_full):
-                    break
-                
-                yield self.env.timeout(10.0) # Revisa cada 10 mins
-                actual_arrival += 10.0
+                wait_duration = self.env.now - wait_start
+                actual_arrival += wait_duration
                 
                 if yard_full:
-                    virtual_wait_yard += 10.0
+                    virtual_wait_yard += wait_duration
                 else:
-                    virtual_wait_gate += 10.0
+                    virtual_wait_gate += wait_duration
                 
         # Llegada física al terminal
         arrival_time = self.env.now
@@ -79,6 +95,16 @@ class PortTerminalSimulation:
             virtual_wait_time = virtual_wait_yard + virtual_wait_gate
             total_wait_time = virtual_wait_time + wait_time_gate + wait_time_yard
             
+            # Tiempo operativo dentro del patio con penalización por congestión (Lean)
+            # A mayor ocupación, mayor tiempo de maniobra/barajado de contenedores (shuffling delay)
+            occupancy = self.get_yard_occupancy()
+            yard_stay_time = 45.0
+            if occupancy > 0.70:
+                yard_stay_time *= (1.0 + 1.5 * (occupancy - 0.70))
+            
+            yield self.env.timeout(yard_stay_time)
+            completion_time = self.env.now
+            
             self.results.append({
                 'truck_id': truck_id,
                 'scheduled_arrival': scheduled_arrival,
@@ -91,17 +117,9 @@ class PortTerminalSimulation:
                 'total_wait_time': total_wait_time,
                 'total_val_time': total_val_time,
                 'has_error': has_error,
-                'yard_occupancy_at_arrival': self.get_yard_occupancy()
+                'yard_occupancy_at_arrival': occupancy,
+                'completion_time': completion_time
             })
-            
-            # Tiempo operativo dentro del patio con penalización por congestión (Lean)
-            # A mayor ocupación, mayor tiempo de maniobra/barajado de contenedores (shuffling delay)
-            occupancy = self.get_yard_occupancy()
-            yard_stay_time = 45.0
-            if occupancy > 0.70:
-                yard_stay_time *= (1.0 + 1.5 * (occupancy - 0.70))
-            
-            yield self.env.timeout(yard_stay_time)
             
         # Reducir el historial reciente para mantener una ventana móvil
         if self.total_recent > 50:

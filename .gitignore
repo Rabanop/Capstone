@@ -2,6 +2,7 @@
 Informe_Educativo.html
 generar_word.py
 informe_final.md
+test_sim.py
 *.docx
 
 # Archivos de caché y compilación de Python

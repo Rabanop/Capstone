@@ -157,10 +157,10 @@ with col_chart2:
 st.divider()
 
 # Fila 3: Análisis de Causas Raíz
-st.subheader("Diagnóstico de Causas Raíz", help="Este gráfico compara los minutos totales que se perdieron por cada problema. Permite ver exactamente qué solucionó el modelo Dinámico.")
+st.subheader("Diagnóstico de Causas Raíz (Minutos por Camión)", help="Este gráfico compara los minutos promedio que un camión pierde por cada problema.")
 st.markdown(f"""
 Al comparar las ineficiencias del sistema tradicional frente al dinámico, 
-podemos ver con exactitud cuántos minutos de espera totales fueron causados por cada problema particular:
+podemos ver con exactitud cuántos minutos de espera **en promedio por camión** son causados por cada problema particular:
 """)
 
 causes = list(rc_static.keys())
@@ -168,14 +168,14 @@ static_values = list(rc_static.values())
 dynamic_values = list(rc_dynamic.values())
 
 fig3 = go.Figure(data=[
-    go.Bar(name='Estático', x=causes, y=static_values, marker_color=color_estatico, text=[f"{v/60:.1f} hrs" for v in static_values], textposition='auto'),
-    go.Bar(name='Dinámico', x=causes, y=dynamic_values, marker_color=color_dinamico, text=[f"{v/60:.1f} hrs" for v in dynamic_values], textposition='auto')
+    go.Bar(name='Estático', x=causes, y=static_values, marker_color=color_estatico, text=[f"{v:.1f} min" for v in static_values], textposition='auto'),
+    go.Bar(name='Dinámico', x=causes, y=dynamic_values, marker_color=color_dinamico, text=[f"{v:.1f} min" for v in dynamic_values], textposition='auto')
 ])
 
 fig3.update_layout(
     barmode='group', 
     margin=dict(l=20, r=20, t=30, b=20),
-    yaxis_title="Total de Minutos de Espera Generados",
+    yaxis_title="Minutos de Espera Promedio por Camión",
     legend_title_text='Modelo'
 )
 st.plotly_chart(fig3, width='stretch')

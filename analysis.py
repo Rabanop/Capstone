@@ -39,10 +39,12 @@ def analyze_root_causes(df: pd.DataFrame) -> Dict[str, float]:
     error_delay_attribution = total_wait_gate * error_fraction
     arrival_peaks_impact = total_wait_gate * (1.0 - error_fraction)
         
+    num_trucks = len(df)
+    
     return {
-        'Falta de espacio en patio': total_wait_yard,
-        'Errores en documentos': error_delay_attribution,
-        'Llegada de muchos camiones a la vez': arrival_peaks_impact
+        'Falta de espacio en patio': total_wait_yard / num_trucks,
+        'Errores en documentos': error_delay_attribution / num_trucks,
+        'Llegada de muchos camiones a la vez': arrival_peaks_impact / num_trucks
     }
 
 def calculate_kpis(df_static: pd.DataFrame, df_dynamic: pd.DataFrame, sim_hours: int) -> Dict[str, Dict[str, float]]:
@@ -56,8 +58,10 @@ def calculate_kpis(df_static: pd.DataFrame, df_dynamic: pd.DataFrame, sim_hours:
         # Promedio de espera total en minutos (Gate + Yard)
         avg_wait = df['total_wait_time'].mean()
         
-        # Throughput = Total camiones procesados / horas de simulación
-        throughput = len(df) / sim_hours
+        # Throughput = Total camiones procesados / (horas reales necesarias para completar la simulación)
+        total_sim_hours = df['completion_time'].max() / 60.0 if 'completion_time' in df.columns else sim_hours
+        if pd.isna(total_sim_hours) or total_sim_hours <= 0: total_sim_hours = sim_hours
+        throughput = len(df) / total_sim_hours
         
         return {'avg_wait_time': avg_wait, 'throughput_per_hour': throughput}
         
