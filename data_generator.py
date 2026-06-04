@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, Any
 
-def generate_historical_data(num_trucks: int = 1000, sim_time_hours: int = 24) -> pd.DataFrame:
+def generate_historical_data(num_trucks: int = 1000, sim_time_hours: int = 24, error_rate: float = 0.15) -> pd.DataFrame:
     """
     Genera un conjunto de datos simulado/histórico para analizar el comportamiento
     base del flujo de camiones en el terminal.
@@ -10,6 +10,7 @@ def generate_historical_data(num_trucks: int = 1000, sim_time_hours: int = 24) -
     Args:
         num_trucks: Número de camiones a simular.
         sim_time_hours: Horas de simulación para distribuir las llegadas.
+        error_rate: Porcentaje de camiones con errores en documentos (0.0 a 1.0).
         
     Returns:
         pd.DataFrame con los datos históricos simulados.
@@ -27,8 +28,8 @@ def generate_historical_data(num_trucks: int = 1000, sim_time_hours: int = 24) -
     validation_times = np.clip(validation_times, 1.0, 10.0)
     
     # Tasa de falla en validaciones (documentos erróneos)
-    # Asumimos que un 15% de los camiones tienen problemas documentales que aumentan su tiempo
-    has_error = np.random.choice([False, True], size=num_trucks, p=[0.85, 0.15])
+    # Depende del parámetro error_rate (por defecto 15%)
+    has_error = np.random.choice([False, True], size=num_trucks, p=[1.0 - error_rate, error_rate])
     
     # Si hay error, el tiempo de validación aumenta considerablemente
     extra_time_for_errors = np.where(has_error, np.random.uniform(5.0, 20.0, size=num_trucks), 0)

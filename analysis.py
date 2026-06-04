@@ -10,14 +10,17 @@ def analyze_root_causes(df: pd.DataFrame) -> Dict[str, float]:
         return {
             'Falta de espacio en patio': 0,
             'Errores en documentos': 0,
-            'Llegada de muchos camiones a la vez': 0
+            'Llegada de muchos camiones a la vez': 0 
         }
         
     # 1. Falta de espacio en patio (espera física + virtual por patio lleno)
     virtual_wait_yard_sum = df['virtual_wait_yard'].sum() if 'virtual_wait_yard' in df.columns else 0.0
     total_wait_yard = df['wait_time_yard'].sum() + virtual_wait_yard_sum
     
-    # 2. Errores en documentos
+    # 2. Errores en documentos vs 3. Llegadas masivas
+    # Calculamos el tiempo total de validación y la fracción de tiempo debido a errores
+    total_gate_time = df['total_val_time'].sum()
+    
     base_avg = df[~df['has_error']]['total_val_time'].mean()
     if pd.isna(base_avg): 
         base_avg = 3.0
@@ -25,14 +28,20 @@ def analyze_root_causes(df: pd.DataFrame) -> Dict[str, float]:
     error_extra_time = df[df['has_error']]['total_val_time'] - base_avg
     total_error_impact = error_extra_time[error_extra_time > 0].sum()
     
-    # 3. Llegadas masivas (espera física en puerta + virtual por cola en puerta)
+    # Fracción de capacidad de ventanilla consumida por errores documentales
+    error_fraction = (total_error_impact / total_gate_time) if total_gate_time > 0 else 0.0
+    
+    # Espera total en puerta (física + virtual)
     virtual_wait_gate_sum = df['virtual_wait_gate'].sum() if 'virtual_wait_gate' in df.columns else 0.0
     total_wait_gate = df['wait_time_gate'].sum() + virtual_wait_gate_sum
-    arrival_peaks_impact = max(0, total_wait_gate - total_error_impact)
+    
+    # Atribución proporcional de la espera real en la cola de entrada
+    error_delay_attribution = total_wait_gate * error_fraction
+    arrival_peaks_impact = total_wait_gate * (1.0 - error_fraction)
         
     return {
         'Falta de espacio en patio': total_wait_yard,
-        'Errores en documentos': total_error_impact,
+        'Errores en documentos': error_delay_attribution,
         'Llegada de muchos camiones a la vez': arrival_peaks_impact
     }
 

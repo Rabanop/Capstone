@@ -47,16 +47,23 @@ sim_time_hours = st.sidebar.slider(
     min_value=8, max_value=48, value=24, step=4,
     help="El tiempo total que durará la simulación virtual."
 )
+document_error_percentage = st.sidebar.slider(
+    "Errores en documentos (%)",
+    min_value=0, max_value=100, value=15, step=1,
+    help="Porcentaje estimado de camiones que presentan problemas con sus documentos al llegar."
+)
+error_rate = document_error_percentage / 100.0
 
 # 1. Generar Datos
-df_base = generate_historical_data(num_trucks=num_trucks, sim_time_hours=sim_time_hours)
+df_base = generate_historical_data(num_trucks=num_trucks, sim_time_hours=sim_time_hours, error_rate=error_rate)
 
 # Parámetros consolidados
 params = get_simulation_parameters()
 params.update({
     'yard_capacity': yard_capacity,
     'gate_capacity': gate_capacity,
-    'sim_time_hours': sim_time_hours
+    'sim_time_hours': sim_time_hours,
+    'base_error_rate': error_rate
 })
 
 # 2. Correr Simulación
