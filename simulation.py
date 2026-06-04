@@ -20,11 +20,14 @@ class PortTerminalSimulation:
         self.recent_errors = 0
         self.total_recent = 0
         
+        self.num_trucks = len(df)
+        self.trucks_completed = 0
+        
         if self.is_dynamic:
             self.env.process(self.vbs_controller())
 
     def vbs_controller(self):
-        while True:
+        while self.trucks_completed < self.num_trucks:
             gate_full = len(self.gate.queue) > (self.gate.capacity * 2)
             yard_full = self.get_yard_occupancy() > 0.85
             
@@ -104,6 +107,7 @@ class PortTerminalSimulation:
             
             yield self.env.timeout(yard_stay_time)
             completion_time = self.env.now
+            self.trucks_completed += 1
             
             self.results.append({
                 'truck_id': truck_id,
